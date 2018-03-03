@@ -23,9 +23,11 @@ namespace ContosoWebApplication.Controllers
     [Authorize]
     public class AccountController : Controller
     {
-        string ApimRestHost = "https://griffsdemoapi.management.azure-api.net/";
-        string ApimRestId = "integration";
-        string ApimRestPK = "QDAnXI0dXSzs9Ra/GU3dl/Iizu99M6ZM7FNLRu83+NYdY5LTDsCn+6mzh4AQMMuVHA1PVNKW31bqqBs+Kxy8HA==";
+        //======= MANAGEMENT API details for your APIM instance =========================================================================
+        string ApimRestHost = ""; //Insert your API Management management tenant URL - ie. https://YOURAPIMNAME.management.azure-api.net/
+        string ApimRestId = ""; //The Identifier from the Credentials section i.e. "Integration"
+        string ApimRestPK = ""; //The Primary Key from Management API tab
+        //===============================================================================================================================
         System.DateTime ApimRestExpiry = DateTime.UtcNow.AddDays(10);
         string ApimRestApiVersion = "2017-03-01";
 
@@ -409,9 +411,9 @@ namespace ContosoWebApplication.Controllers
 
         public async Task<ActionResult> Delegate()
         {
-            //Add your Delegation Validation key below
-            string key = "aW50ZWdyYXRpb24mMjAxODAzMzExNzE1JlJGWFFiSjhYcCtNYXB0ZTRBMm1KbjVVMjg3U1I4Y01IVVRxaU0xb2x2dUpaSXIvYjRUZlMrN2pjNDdVZFBrZlV3NTd4R1VUdXVLcVcxRzQ0RnBZVFhRPT0=";//<<< Replace this with your APIM Delegation Key
-            //--------
+            //=== INSERT YOUR DELEGATION CREDENTIALS BELOW ========================================================
+            string key = ""; //<<< Replace this with your APIM Delegation Key from the Delegation tab
+            //=====================================================================================================
             string returnUrl = Request.QueryString["returnUrl"];
             string productId = Request.QueryString["productId"];
             string subscriptionId = Request.QueryString["subscriptionId"];
@@ -569,8 +571,8 @@ namespace ContosoWebApplication.Controllers
                     {
                         //Subscription created
 
-                        return Redirect(Request.QueryString["returnUrl"]);
-                        //return Redirect("https://contosoinc.portal.azure-api.net/developer");
+                        return Redirect(Request.QueryString["returnUrl"]); //<<< COMMENT THIS OUT WHEN YOU'VE UNCOMMENTED THE BELOW
+                        //return Redirect("https://YOURAPIMNAME.portal.azure-api.net/developer"); //<<< UNCOMMENT THIS WHEN YOU'VE CHANGED IT
                     }
                 }
 
