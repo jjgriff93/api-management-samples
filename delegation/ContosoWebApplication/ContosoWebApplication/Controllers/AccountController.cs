@@ -23,11 +23,11 @@ namespace ContosoWebApplication.Controllers
     [Authorize]
     public class AccountController : Controller
     {
-        string ApimRestHost = "https://contosoinc.management.azure-api.net/";
-        string ApimRestId = "547f835d8b70eb0628030003";
-        string ApimRestPK = "0NfbTL7h+L8C80LzBmlNrF61x8CvxKPCnqZzYMTuljhIsWfApIQlWTD4M5KioZsZx/1F8aI0XGHyX2ALNpV8Ow==";
+        string ApimRestHost = "https://griffsdemoapi.management.azure-api.net/";
+        string ApimRestId = "integration";
+        string ApimRestPK = "QDAnXI0dXSzs9Ra/GU3dl/Iizu99M6ZM7FNLRu83+NYdY5LTDsCn+6mzh4AQMMuVHA1PVNKW31bqqBs+Kxy8HA==";
         System.DateTime ApimRestExpiry = DateTime.UtcNow.AddDays(10);
-        string ApimRestApiVersion = "2014-02-14-preview";
+        string ApimRestApiVersion = "2017-03-01";
 
         public AccountController()
             : this(new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(new ApplicationDbContext())))
@@ -139,7 +139,7 @@ namespace ContosoWebApplication.Controllers
                     {
                         client.BaseAddress = new Uri(ApimRestHost);
                         client.DefaultRequestHeaders.Add("Authorization", ApimRestAuthHeader());
-                        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/json"));
+                        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
                         var ApimUser = new
                         {
@@ -152,7 +152,7 @@ namespace ContosoWebApplication.Controllers
 
                         var ApimUserJson = SerializeToJson(ApimUser);
 
-                        HttpResponseMessage response = await client.PutAsync("/users/" + user.Id + "?api-version=" + ApimRestApiVersion, new StringContent(ApimUserJson, Encoding.UTF8, "text/json"));
+                        HttpResponseMessage response = await client.PutAsync("/users/" + user.Id + "?api-version=" + ApimRestApiVersion, new StringContent(ApimUserJson, Encoding.UTF8, "application/json"));
                         if (response.IsSuccessStatusCode)
                         {
                             //User created successfully
@@ -409,7 +409,9 @@ namespace ContosoWebApplication.Controllers
 
         public async Task<ActionResult> Delegate()
         {
-            string key = "A83LOoMIlPULlEBu9GuIoZoT9HSMHhGZTlvjhw6FNgMO0gTSis4u0otFPdcelheOF7asMs6pQUSP66w8EqbBOg==";
+            //Add your Delegation Validation key below
+            string key = "aW50ZWdyYXRpb24mMjAxODAzMzExNzE1JlJGWFFiSjhYcCtNYXB0ZTRBMm1KbjVVMjg3U1I4Y01IVVRxaU0xb2x2dUpaSXIvYjRUZlMrN2pjNDdVZFBrZlV3NTd4R1VUdXVLcVcxRzQ0RnBZVFhRPT0=";//<<< Replace this with your APIM Delegation Key
+            //--------
             string returnUrl = Request.QueryString["returnUrl"];
             string productId = Request.QueryString["productId"];
             string subscriptionId = Request.QueryString["subscriptionId"];
@@ -480,19 +482,16 @@ namespace ContosoWebApplication.Controllers
                                         
                             }
                         }
-                        break;
                            
                     case "Subscribe":
                     case "Unsubscribe":
                         return RedirectToAction("Product", "Account", new { operation = Request.QueryString["operation"], returnUrl = Request.QueryString["returnUrl"], productId = Request.QueryString["productId"], userId = Request.QueryString["userId"], subscriptionId = Request.QueryString["subscriptionId"] });
-                        break;
 
                     case "ChangeProfile":
                     case "ChangePassword":
                         return RedirectToAction("Manage", "Account", new { returnUrl = Request.QueryString["returnUrl"] });
-                            break;
-                            default:
-                    return View();
+                    default:
+                        return View();
                 }
             }
             else
@@ -570,8 +569,8 @@ namespace ContosoWebApplication.Controllers
                     {
                         //Subscription created
 
-                        //return Redirect(Request.QueryString["returnUrl"]);
-                        return Redirect("https://contosoinc.portal.azure-api.net/developer");
+                        return Redirect(Request.QueryString["returnUrl"]);
+                        //return Redirect("https://contosoinc.portal.azure-api.net/developer");
                     }
                 }
 
