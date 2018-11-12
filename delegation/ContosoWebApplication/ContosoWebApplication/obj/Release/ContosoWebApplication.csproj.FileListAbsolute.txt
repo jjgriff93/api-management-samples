@@ -54,3 +54,4 @@ C:\Users\jamesgr\OneDrive - Microsoft\Azure Solutions\App Dev\APIApps\api-manage
 C:\Users\jamesgr\OneDrive - Microsoft\Azure Solutions\App Dev\APIApps\api-management-samples\delegation\ContosoWebApplication\ContosoWebApplication\obj\Release\ContosoWebApplication.csproj.CoreCompileInputs.cache
 C:\Users\jamesgr\OneDrive - Microsoft\Azure Solutions\App Dev\APIApps\api-management-samples\delegation\ContosoWebApplication\ContosoWebApplication\obj\Release\ContosoWebApplication.dll
 C:\Users\jamesgr\OneDrive - Microsoft\Azure Solutions\App Dev\APIApps\api-management-samples\delegation\ContosoWebApplication\ContosoWebApplication\obj\Release\ContosoWebApplication.pdb
+C:\Users\jamesgr\OneDrive - Microsoft\Azure Solutions\App Dev\APIApps\api-management-samples\delegation\ContosoWebApplication\ContosoWebApplication\bin\Stripe.net.dll

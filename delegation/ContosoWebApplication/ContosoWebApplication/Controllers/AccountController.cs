@@ -16,7 +16,7 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using Newtonsoft.Json;
 using System.IO;
-
+using Stripe;
 
 namespace ContosoWebApplication.Controllers
 {
@@ -25,11 +25,26 @@ namespace ContosoWebApplication.Controllers
     {
         //======= MANAGEMENT API details for your APIM instance =========================================================================
         string ApimRestHost = ""; //Insert your API Management management tenant URL - ie. https://YOURAPIMNAME.management.azure-api.net/
-        string ApimRestId = ""; //The Identifier from the Credentials section i.e. "Integration"
+        string ApimRestId = ""; //The Identifier from the Credentials section i.e. "integration"
         string ApimRestPK = ""; //The Primary Key from Management API tab
         //===============================================================================================================================
         System.DateTime ApimRestExpiry = DateTime.UtcNow.AddDays(10);
         string ApimRestApiVersion = "2017-03-01";
+
+        //=== INSERT YOUR DELEGATION CREDENTIALS BELOW ==================================================================================
+        string delegationKey = ""; //<<< Replace this with your APIM Delegation Key from the Delegation tab
+        //===============================================================================================================================
+
+        //==== INSERT YOUR DEVELOPER PORTAL URL BELOW ===================================================================================
+        string developerPortalUrl = "";
+        //===============================================================================================================================
+            
+        //======= STRIPE API SET-UP =====================================================================================================
+        // Set your secret key: remember to change this to your live secret key in production 
+        string StripeAPIKey = ""; // See your keys here: https://dashboard.stripe.com/account/apikeys
+        //===============================================================================================================================
+
+        
 
         public AccountController()
             : this(new UserManager<ApplicationUser>(new UserStore<ApplicationUser>(new ApplicationDbContext())))
@@ -132,7 +147,21 @@ namespace ContosoWebApplication.Controllers
         {
             if (ModelState.IsValid)
             {
-                var user = new ApplicationUser() { UserName = model.UserName };
+                // Create the user in Stripe using the Stripe API
+                StripeConfiguration.SetApiKey(StripeAPIKey);
+                var options = new StripeCustomerCreateOptions
+                {
+                    //Add the customer's email address to Stripe
+                    Email = model.Email,
+                };
+                var service = new StripeCustomerService();
+                //Returns us a customer object with a unique Stripe ID for them
+                StripeCustomer customer = service.Create(options);
+
+                //Create the user object with the ID returned from Stripe
+                var user = new ApplicationUser() { UserName = model.UserName, StripeId = customer.Id };
+
+                //Save to local DB
                 var result = await UserManager.CreateAsync(user, model.Password);
                 if (result.Succeeded)
                 {
@@ -411,9 +440,6 @@ namespace ContosoWebApplication.Controllers
 
         public async Task<ActionResult> Delegate()
         {
-            //=== INSERT YOUR DELEGATION CREDENTIALS BELOW ========================================================
-            string key = ""; //<<< Replace this with your APIM Delegation Key from the Delegation tab
-            //=====================================================================================================
             string returnUrl = Request.QueryString["returnUrl"];
             string productId = Request.QueryString["productId"];
             string subscriptionId = Request.QueryString["subscriptionId"];
@@ -424,7 +450,7 @@ namespace ContosoWebApplication.Controllers
 
             //First, validate the signature of the request
 
-            var encoder = new HMACSHA512(Convert.FromBase64String(key));
+            var encoder = new HMACSHA512(Convert.FromBase64String(delegationKey));
 
             switch (Request.QueryString["operation"])
             {
@@ -465,9 +491,9 @@ namespace ContosoWebApplication.Controllers
                             {
                                 client.BaseAddress = new Uri(ApimRestHost);
                                 client.DefaultRequestHeaders.Add("Authorization", ApimRestAuthHeader());
-                                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/json"));
+                                client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                                HttpResponseMessage response = await client.PostAsync("/users/" + User.Identity.GetUserId() + "/generateSsoUrl?api-version=" + ApimRestApiVersion, new StringContent("", Encoding.UTF8, "text/json"));
+                                HttpResponseMessage response = await client.PostAsync("/users/" + User.Identity.GetUserId() + "/generateSsoUrl?api-version=" + ApimRestApiVersion, new StringContent("", Encoding.UTF8, "application/json"));
                                 if (response.IsSuccessStatusCode)
                                 {
                                     //We got an SSO token - redirect
@@ -512,7 +538,7 @@ namespace ContosoWebApplication.Controllers
             ViewBag.Operation = Request.QueryString["operation"];
             ViewBag.ReturnUrl = Request.QueryString["returnUrl"];
 
-            //Set the proper title based on the operation at hadnd
+            //Set the proper title based on the operation at hand
             ViewBag.Title = "Product Subscription";
 
             switch (Request.QueryString["operation"])
@@ -530,50 +556,73 @@ namespace ContosoWebApplication.Controllers
             //If this is the confirmation of the page, perform needed operation
             if (Request.QueryString["action"] == "confirm")
             {
-                //Register user for product
-                using (var client = new HttpClient())
+                //Register user for Product Plan in Stripe
+                StripeConfiguration.SetApiKey(StripeAPIKey);
+
+                var items = new List<StripeSubscriptionItemOption> {
+                    //Subscribe to Stripe plan with corresponding ID - ENSURE YOUR STRIPE PRICING PLAN ID IS IDENTICAL TO THE APIM PRODUCT ID
+                    new StripeSubscriptionItemOption {PlanId = Request.QueryString["productId"]}
+                };
+                var options = new StripeSubscriptionCreateOptions
                 {
-                    client.BaseAddress = new Uri(ApimRestHost);
-                    client.DefaultRequestHeaders.Add("Authorization", ApimRestAuthHeader());
-                    client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("text/json"));
+                    Items = items,
+                };
+                var service = new StripeSubscriptionService();
 
-                    HttpResponseMessage response;
+                //Get user's Stripe ID by retrieving object from user store
+                var user = await UserManager.FindByIdAsync(Request.QueryString["userId"]);
+                //Create a plan subscription for that user
+                StripeSubscription subscription = service.Create(user.StripeId, options);
 
-                    switch (Request.QueryString["operation"])
+                if (subscription.Status == "active")
+                {
+                    //Register user for product in APIM
+                    using (var client = new HttpClient())
                     {
-                        case "Subscribe":
-                            var ApimSubscription = new
-                            {
-                                userId = "/users/" + Request.QueryString["userId"],
-                                productId = "/products/" + Request.QueryString["productId"],
-                                state = "active"
-                            };
+                        client.BaseAddress = new Uri(ApimRestHost);
+                        client.DefaultRequestHeaders.Add("Authorization", ApimRestAuthHeader());
+                        client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
 
-                            var ApimSubscriptionJson = SerializeToJson(ApimSubscription);
+                        HttpResponseMessage response;
 
-                            Guid subscriptionId = Guid.NewGuid();
+                        switch (Request.QueryString["operation"])
+                        {
+                            case "Subscribe":
+                                var ApimSubscription = new
+                                {
+                                    userId = "/users/" + Request.QueryString["userId"],
+                                    productId = "/products/" + Request.QueryString["productId"],
+                                    state = "active"
+                                };
 
-                            response = await client.PutAsync("/subscriptions/" + subscriptionId + "?api-version=" + ApimRestApiVersion, new StringContent(ApimSubscriptionJson, Encoding.UTF8, "text/json"));
+                                var ApimSubscriptionJson = SerializeToJson(ApimSubscription);
 
-                            break;
+                                Guid subscriptionId = Guid.NewGuid();
 
-                        case "Unsubscribe":
-                            client.DefaultRequestHeaders.Add("If-Match", "*");
-                            response = await client.DeleteAsync("/subscriptions/" + Request.QueryString["subscriptionId"] + "?api-version=" + ApimRestApiVersion);
-                            break;
+                                response = await client.PutAsync("/subscriptions/" + subscriptionId + "?api-version=" + ApimRestApiVersion, new StringContent(ApimSubscriptionJson, Encoding.UTF8, "text/json"));
 
-                        default:
-                            response = new HttpResponseMessage(System.Net.HttpStatusCode.Unused);
-                            break;
+                                break;
+
+                            case "Unsubscribe":
+                                client.DefaultRequestHeaders.Add("If-Match", "*");
+                                response = await client.DeleteAsync("/subscriptions/" + Request.QueryString["subscriptionId"] + "?api-version=" + ApimRestApiVersion);
+                                break;
+
+                            default:
+                                response = new HttpResponseMessage(System.Net.HttpStatusCode.Unused);
+                                break;
+                        }
+
+                        if (response.IsSuccessStatusCode)
+                        {
+                            //Subscription created
+                            return Redirect(developerPortalUrl); 
+                        }
                     }
-
-                    if (response.IsSuccessStatusCode)
-                    {
-                        //Subscription created
-
-                        return Redirect(Request.QueryString["returnUrl"]); //<<< COMMENT THIS OUT WHEN YOU'VE UNCOMMENTED THE BELOW
-                        //return Redirect("https://YOURAPIMNAME.portal.azure-api.net/developer"); //<<< UNCOMMENT THIS WHEN YOU'VE CHANGED IT
-                    }
+                }
+                else
+                {
+                    ViewBag.Message = "Sorry, it looks like you either haven't got a credit card set up with Stripe yet, or this product isn't currently available. Please try again later.";
                 }
 
 
